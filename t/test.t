@@ -9,7 +9,7 @@ $ENV{TEST_NGINX_RESOLVER} = '8.8.8.8';
 $ENV{TEST_COVERAGE} ||= 0;
 
 our $HttpConfig = qq{
-    lua_package_path "$pwd/lib/?.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/lib/lua/?.lua;;";
+    lua_package_path "$pwd/lib/?.lua;/usr/local/lib/lua/?.lua;;";
     error_log logs/error.log debug;
 
     init_by_lua_block {
