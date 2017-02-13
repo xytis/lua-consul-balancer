@@ -15,6 +15,7 @@ end
 local _M = new_tab(0, 5) -- Change the second number.
 
 _M.VERSION = "0.01"
+_M._cache = {}
 
 function _sanitize_uri(consul_uri)
   -- TODO: Ensure that uri has <proto>://<host>[:<port>] scheme
@@ -28,18 +29,48 @@ function _timer(...)
   end
 end
 
-function _parse_service(data)
+function _parse_service(service_id, response)
+  if response.status ~= 200 then
+    return nil, "bad response code: " .. response.status
+  end
+  local ok, content = pcall(function()
+    return json.decode(response.body)
+  end)
+  if not ok then
+    return nil, "JSON decode error"
+  end
+  if not response.headers["X-Consul-Knownleader"] or response.headers["X-Consul-Knownleader"] == "false" then
+    return nil, "not trusting leaderless consul"
+  end
   -- TODO: reuse some table?
-  return {}
+  local service = {
+    id = service_id
+  }
+  if not response.headers["X-Consul-Index"] then
+    return nil, "missing consul index"
+  else
+    service.index = response.headers["X-Consul-Index"]
+  end
+  service.upstreams = {}
+  for k, v in pairs(content) do
+    if v["ServiceID"] == service_id then
+      table.insert(service.upstreams, {
+          address = v["Address"],
+          port = v["ServicePort"],
+        })
+    end
+  end
+  return service
 end
 
 function _persist(service)
   -- TODO: save to shared storage
+  _M._cache[service.id] = service
 end
 
 function _aquire(service_id)
   -- TODO: get from shared storage
-  return {}
+  return _M._cache[service_id]
 end
 
 function _refresh(service_id, hc)
@@ -47,18 +78,16 @@ function _refresh(service_id, hc)
     hc = http:new()
   end
   local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id, {
-    method = "GET"
-  })
+      method = "GET"
+    })
   if res == nil then
-    ngx.log(ngx.ERR, "consul.balancer: FAILED to refresh upstreams: " .. err)
-  elseif res.body then
-    local ok, data = pcall(function()
-      return json.decode(res.body)
-    end)
-    if ok then
-      _persist(_parse_service(data))
+    ngx.log(ngx.ERR, "consul.balancer: FAILED to refresh upstreams: ", err)
+  else
+    local service, err = _parse_service(service_id, res)
+    if err == nil then
+      _persist(service)
     else
-      ngx.log(ngx.ERR, "consul.balancer: failed to parse consul response")
+      ngx.log(ngx.ERR, "consul.balancer: failed to parse consul response: ", err)
     end
   end
 end
@@ -68,15 +97,15 @@ function _watch(service_id)
   _refresh(service_id, hc)
   local current_service, err = _aquire(service_id)
   if err ~= nil then
-    ngx.log(ngx.ERR, "consul.balancer: failed to start watching for changes in " .. service_id)
+    ngx.log(ngx.ERR, "consul.balancer: failed to start watching for changes in ", service_id)
     _timer(WATCH_RETRY_TIMER, _watch, service_id)
     return nil, err
   end
-  ngx.log(ngx.INFO, "consul.balancer: started watching for changes in " .. service_id)
+  ngx.log(ngx.INFO, "consul.balancer: started watching for changes in ", service_id)
   while true do
     local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. current_service.index, {
-      method = "GET"
-    })
+        method = "GET"
+      })
     if res ~= nil and res.body then
       local ok, data = pcall(function()
         return json.decode(res.body)
