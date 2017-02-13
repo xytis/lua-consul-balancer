@@ -133,6 +133,9 @@ function _M.round_robin(service_id)
     ngx.log(ngx.ERR, "consul.balancer: no entry found for service: ", service_id)
     return ngx.exit(500)
   end
+  if service.upstreams == nil or #service.upstreams == 0 then
+    ngx.log(ngx.ERR, "consul.balancer: no peers for service: ", service_id)
+  end
   if service.state == nil or service.state > #service.upstreams then
     service.state = 1
   end
