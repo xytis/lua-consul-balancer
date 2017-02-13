@@ -53,12 +53,12 @@ function _parse_service(service_id, response)
   end
   service.upstreams = {}
   for k, v in pairs(content) do
-    if v["ServiceID"] == service_id then
-      table.insert(service.upstreams, {
-          address = v["Address"],
-          port = v["ServicePort"],
-        })
-    end
+    -- if v["ServiceID"] == service_id then -- I think this check is useless
+    table.insert(service.upstreams, {
+        address = v["Address"],
+        port = v["ServicePort"],
+      })
+    -- end
   end
   return service
 end
