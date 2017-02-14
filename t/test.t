@@ -20,6 +20,22 @@ our $HttpConfig = qq{
         local consul_balancer = require "n4l.consul.balancer"
         consul_balancer.watch("http://127.0.0.1:8500", {"foo", "bar"})
     }
+
+    upstream upstream_foo {
+        server 127.0.0.1:666;
+        balancer_by_lua_block {
+            local consul_balancer = require "n4l.consul.balancer"
+            consul_balancer.round_robin("foo")
+        }
+    }
+
+    upstream upstream_bar {
+        server 127.0.0.1:666;
+        balancer_by_lua_block {
+            local consul_balancer = require "n4l.consul.balancer"
+            consul_balancer.round_robin("bar")
+        }
+    }
 };
 
 no_long_string();
@@ -30,32 +46,16 @@ run_tests();
 __DATA__
 === TEST 1: Balancing
 --- http_config eval: $::HttpConfig
-  upstream upstream_foo {
-    server 127.0.0.1:666;
-    balancer_by_lua_block {
-      local consul_balancer = require "n4l.consul.balancer"
-      consul_balancer.round_robin("foo")
-    }
-  }
-
-  upstream upstream_bar {
-    server 127.0.0.1:666;
-    balancer_by_lua_block {
-      local consul_balancer = require "n4l.consul.balancer"
-      consul_balancer.round_robin("bar")
-    }
-  }
 --- config
-  location = /foo {
-    proxy_pass http://upstream_foo;
-  }
-  location = /bar {
-    proxy_pass http://upstream_bar;
-  }
+    location = /foo {
+        proxy_pass http://upstream_foo;
+    }
+    location = /bar {
+        proxy_pass http://upstream_bar;
+    }
 --- request
 GET /foo
---- response_body
-OK
+--- response_body_like: foo-.*
 --- no_error_log
 [error]
 [warn]
