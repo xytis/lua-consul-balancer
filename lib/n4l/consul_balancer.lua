@@ -23,7 +23,7 @@ function _sanitize_uri(consul_uri)
 end
 
 function _timer(...)
-  local ok, err = ngx.timer.at(unpack(arg))
+  local ok, err = ngx.timer.at(unpack(...))
   if not ok then
     ngx.log(ngx.ERR, "[FATAL] consul.balancer: failed to create timer: ", err)
   end
