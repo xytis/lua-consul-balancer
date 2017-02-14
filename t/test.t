@@ -17,14 +17,14 @@ our $HttpConfig = qq{
             jit.off()
             require("luacov.runner").init()
         end
-        local consul_balancer = require "n4l.consul.balancer"
+        local consul_balancer = require "n4l.consul_balancer"
         consul_balancer.watch("http://127.0.0.1:8500", {"foo", "bar"})
     }
 
     upstream upstream_foo {
         server 127.0.0.1:666;
         balancer_by_lua_block {
-            local consul_balancer = require "n4l.consul.balancer"
+            local consul_balancer = require "n4l.consul_balancer"
             consul_balancer.round_robin("foo")
         }
     }
@@ -32,7 +32,7 @@ our $HttpConfig = qq{
     upstream upstream_bar {
         server 127.0.0.1:666;
         balancer_by_lua_block {
-            local consul_balancer = require "n4l.consul.balancer"
+            local consul_balancer = require "n4l.consul_balancer"
             consul_balancer.round_robin("bar")
         }
     }
