@@ -25,6 +25,7 @@ env:
     - OPENSSL_LIB=$OPENSSL_PREFIX/lib
     - OPENSSL_INC=$OPENSSL_PREFIX/include
     - OPENSSL_VER=1.0.2h
+    - CONSUL_VER=0.7.4
     - LD_LIBRARY_PATH=$LUAJIT_LIB:$LD_LIBRARY_PATH
     - TEST_NGINX_SLEEP=0.006
   matrix:
@@ -34,6 +35,7 @@ env:
 install:
   - if [ ! -d download-cache ]; then mkdir download-cache; fi
   - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -O download-cache/openssl-$OPENSSL_VER.tar.gz https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz; fi
+  - if [ ! -f download-cache/consul_${CONSUL_VER}_linux_amd64.zip ]; then wget -O download-cache/consul_${CONSUL_VER}_linux_amd64.zip https://releases.hashicorp.com/consul/${CONSUL_VER}/consul_${CONSUL_VER}_linux_amd64.zip; fi
   - sudo apt-get install -qq -y cpanminus axel
   - sudo cpanm --notest Test::Nginx > build.log 2>&1 || (cat build.log && exit 1)
   - wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
@@ -62,12 +64,20 @@ script:
   - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
   - sudo make PATH=$PATH install_sw > build.log 2>&1 || (cat build.log && exit 1)
   - cd -
+  # consul
+  - unzip download-cache/consul_${CONSUL_VER}_linux_amd64.zip
+  - ./consul agent -dev > consul.out 2>&1 &
   #nginx install
   - export PATH=$PWD/work/nginx/sbin:$PWD/nginx-devel-utils:$PATH
   - export NGX_BUILD_CC=$CC
   - ngx-build $NGINX_VERSION --with-ipv6 --with-http_realip_module --with-http_ssl_module --add-module=../echo-nginx-module --add-module=../lua-nginx-module --with-debug
   - nginx -V
   - ldd `which nginx`|grep -E 'luajit|ssl|pcre'
+  # consul fixtures
+  - curl -X PUT -d '{"ID": "foo-1", "Name": "foo", "Port": 667 }}' http://127.0.0.1:8500/v1/agent/service/register
+  - curl -X PUT -d '{"ID": "foo-2", "Name": "foo", "Port": 668 }}' http://127.0.0.1:8500/v1/agent/service/register
+  - curl -X PUT -d '{"ID": "foo-3", "Name": "foo", "Port": 669 }}' http://127.0.0.1:8500/v1/agent/service/register
+  - curl -X PUT -d '{"ID": "bar-1", "Name": "foo", "Port": 665 }}' http://127.0.0.1:8500/v1/agent/service/register
   #test launcher
   - prove -r t
 

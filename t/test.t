@@ -17,6 +17,8 @@ our $HttpConfig = qq{
             jit.off()
             require("luacov.runner").init()
         end
+        local consul_balancer = require "n4l.consul.balancer"
+        consul_balancer.watch("http://127.0.0.1:8500", {"foo", "bar"})
     }
 };
 
@@ -26,30 +28,32 @@ no_long_string();
 run_tests();
 
 __DATA__
-=== TEST 1: Simple default get.
+=== TEST 1: Balancing
 --- http_config eval: $::HttpConfig
+  upstream upstream_foo {
+    server 127.0.0.1:666;
+    balancer_by_lua_block {
+      local consul_balancer = require "n4l.consul.balancer"
+      consul_balancer.round_robin("foo")
+    }
+  }
+
+  upstream upstream_bar {
+    server 127.0.0.1:666;
+    balancer_by_lua_block {
+      local consul_balancer = require "n4l.consul.balancer"
+      consul_balancer.round_robin("bar")
+    }
+  }
 --- config
-    location = /a {
-        content_by_lua '
-            local http = require "resty.http"
-            local httpc = http.new()
-            httpc:connect("127.0.0.1", ngx.var.server_port)
-
-            local res, err = httpc:request{
-                path = "/b"
-            }
-
-            ngx.status = res.status
-            ngx.print(res:read_body())
-
-            httpc:close()
-        ';
-    }
-    location = /b {
-        echo "OK";
-    }
+  location = /foo {
+    proxy_pass http://upstream_foo;
+  }
+  location = /bar {
+    proxy_pass http://upstream_bar;
+  }
 --- request
-GET /a
+GET /foo
 --- response_body
 OK
 --- no_error_log
