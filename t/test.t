@@ -17,6 +17,9 @@ our $HttpConfig = qq{
             jit.off()
             require("luacov.runner").init()
         end
+    }
+
+    init_worker_by_lua_block {
         local consul_balancer = require "n4l.consul_balancer"
         consul_balancer.watch("http://127.0.0.1:8500", {"foo", "bar"})
     }
