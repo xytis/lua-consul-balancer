@@ -73,7 +73,11 @@ function _aquire(service_id)
   return _M._cache[service_id]
 end
 
-function _refresh(service_id, hc)
+-- signature must match nginx timer API
+function _refresh(premature, service_id, hc)
+  if premature then
+    return nil
+  end
   if hc == nil then
     hc = http:new()
   end
@@ -92,9 +96,13 @@ function _refresh(service_id, hc)
   end
 end
 
-function _watch(service_id)
+-- signature must match nginx timer API
+function _watch(premature, service_id)
+  if premature then
+    return nil
+  end
   local hc = http:new()
-  _refresh(service_id, hc)
+  _refresh(false, service_id, hc)
   local current_service, err = _aquire(service_id)
   if err ~= nil then
     ngx.log(ngx.ERR, "consul.balancer: failed to start watching for changes in ", service_id)
