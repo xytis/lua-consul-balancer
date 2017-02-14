@@ -5,7 +5,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     server.vm.hostname = "openresty"
     server.vm.box = "ubuntu/trusty64"
     server.vm.provider :virtualbox do |vb|
-      vb.customize ["modifyvm", :id, "--memory", "256"]
+      vb.customize ["modifyvm", :id, "--memory", "1024"]
     end
   end
 end

@@ -3,7 +3,10 @@
 --
 --
 
+-- Dependencies
 local http = require "resty.http"
+local balancer = require "ngx.balancer"
+local json = require "cjson"
 
 local WATCH_RETRY_TIMER = 0.5
 
@@ -114,11 +117,8 @@ function _watch(premature, service_id)
     local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. current_service.index, {
         method = "GET"
       })
-    if res ~= nil and res.body then
-      local ok, data = pcall(function()
-        return json.decode(res.body)
-      end)
-      local service = _parse_service(data)
+    if res ~= nil then
+      local service = _parse_service(service_id, res)
       if service.modification_index ~= current_service.modification_index then
         _persist(service)
       end
