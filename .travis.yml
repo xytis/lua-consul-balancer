@@ -74,10 +74,10 @@ script:
   - nginx -V
   - ldd `which nginx`|grep -E 'luajit|ssl|pcre'
   # consul fixtures
-  - curl -X PUT -d '{"ID": "foo-1", "Name": "foo", "Port": 667 }}' http://127.0.0.1:8500/v1/agent/service/register
-  - curl -X PUT -d '{"ID": "foo-2", "Name": "foo", "Port": 668 }}' http://127.0.0.1:8500/v1/agent/service/register
-  - curl -X PUT -d '{"ID": "foo-3", "Name": "foo", "Port": 669 }}' http://127.0.0.1:8500/v1/agent/service/register
-  - curl -X PUT -d '{"ID": "bar-1", "Name": "foo", "Port": 665 }}' http://127.0.0.1:8500/v1/agent/service/register
+  - "curl -X PUT -d '{\"ID\": \"foo-1\", \"Name\": \"foo\", \"Port\": 667 }' http://127.0.0.1:8500/v1/agent/service/register"
+  - "curl -X PUT -d '{\"ID\": \"foo-2\", \"Name\": \"foo\", \"Port\": 668 }' http://127.0.0.1:8500/v1/agent/service/register"
+  - "curl -X PUT -d '{\"ID\": \"foo-3\", \"Name\": \"foo\", \"Port\": 669 }' http://127.0.0.1:8500/v1/agent/service/register"
+  - "curl -X PUT -d '{\"ID\": \"bar-1\", \"Name\": \"foo\", \"Port\": 665 }' http://127.0.0.1:8500/v1/agent/service/register"
   #test launcher
   - prove -r t
 
