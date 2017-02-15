@@ -77,7 +77,9 @@ function _aquire(service_id)
 end
 
 function _refresh(service_id, hc, index)
-  local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index, {
+  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index
+  ngx.log(ngx.DEBUG, "consul.balancer: query uri: ", uri)
+  local res, err = hc:request_uri(uri, {
     method = "GET"
   })
   if res == nil then
@@ -87,7 +89,7 @@ function _refresh(service_id, hc, index)
     local service, err = _parse_service(service_id, res)
     if err == nil then
       -- TODO: Save only newer data from consul to reduce GC load
-      ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_id, " index: ", service.index)
+      ngx.log(ngx.DEBUG, "consul.balancer: persisted service ", service_id, " index: ", service.index)
       _persist(service)
       return service
     else
