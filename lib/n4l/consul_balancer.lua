@@ -76,25 +76,23 @@ function _aquire(service_id)
   return _M._cache[service_id]
 end
 
--- signature must match nginx timer API
-function _refresh(premature, service_id, hc)
-  if premature then
-    return nil
-  end
-  if hc == nil then
-    hc = http:new()
-  end
-  local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id, {
-      method = "GET"
-    })
+function _refresh(service_id, hc, index)
+  local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index, {
+    method = "GET"
+  })
   if res == nil then
     ngx.log(ngx.ERR, "consul.balancer: FAILED to refresh upstreams: ", err)
+    return nil, err
   else
     local service, err = _parse_service(service_id, res)
     if err == nil then
+      -- TODO: Save only newer data from consul to reduce GC load
+      ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_id, " index: ", service.index)
       _persist(service)
+      return service
     else
       ngx.log(ngx.ERR, "consul.balancer: failed to parse consul response: ", err)
+      return nil, err
     end
   end
 end
@@ -105,24 +103,16 @@ function _watch(premature, service_id)
     return nil
   end
   local hc = http:new()
-  _refresh(false, service_id, hc)
-  local current_service, err = _aquire(service_id)
-  if err ~= nil then
-    ngx.log(ngx.ERR, "consul.balancer: failed to start watching for changes in ", service_id)
-    _timer(WATCH_RETRY_TIMER, _watch, service_id)
-    return nil, err
-  end
+  local service_index = 0
   ngx.log(ngx.INFO, "consul.balancer: started watching for changes in ", service_id)
   while true do
-    local res, err = hc:request_uri(_M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. current_service.index, {
-        method = "GET"
-      })
-    if res ~= nil then
-      local service = _parse_service(service_id, res)
-      if service.modification_index ~= current_service.modification_index then
-        _persist(service)
-      end
+    local service, err = _refresh(service_id, hc, service_index)
+    if err ~= nil then
+      ngx.log(ngx.ERR, "consul.balancer: failed while watching for changes in ", service_id)
+      _timer(WATCH_RETRY_TIMER, _watch, service_id)
+      return nil
     end
+    service_index = service.index
   end
 end
 
@@ -130,7 +120,6 @@ function _M.watch(consul_uri, service_list)
   -- TODO: Reconsider scope for this variable.
   _M._consul_uri = _sanitize_uri(consul_uri)
   for k,v in pairs(service_list) do
-    _timer(0, _refresh, v)
     _timer(0, _watch, v)
   end
 end
