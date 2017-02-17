@@ -77,7 +77,7 @@ function _aquire(service_id)
 end
 
 function _refresh(service_id, hc, index)
-  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index
+  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index .. "&wait=5m"
   ngx.log(ngx.INFO, "consul.balancer: query uri: ", uri)
   local res, err = hc:request_uri(uri, {
     method = "GET"
