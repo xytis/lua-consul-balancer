@@ -105,6 +105,7 @@ function _watch(premature, service_id)
     return nil
   end
   local hc = http:new()
+  hc:set_timeout(360000) -- consul api has a default of 5 minutes for tcp long poll
   local service_index = 0
   ngx.log(ngx.NOTICE, "consul.balancer: started watching for changes in ", service_id)
   while true do
