@@ -17,7 +17,7 @@ end
 
 local _M = new_tab(0, 5) -- Change the second number.
 
-_M.VERSION = "0.01"
+_M.VERSION = "0.02"
 _M._cache = {}
 
 function _sanitize_uri(consul_uri)
@@ -32,7 +32,7 @@ function _timer(...)
   end
 end
 
-function _parse_service(service_id, response)
+function _parse_service(response)
   if response.status ~= 200 then
     return nil, "bad response code: " .. response.status
   end
@@ -46,9 +46,7 @@ function _parse_service(service_id, response)
     return nil, "not trusting leaderless consul"
   end
   -- TODO: reuse some table?
-  local service = {
-    id = service_id
-  }
+  local service = {}
   if not response.headers["X-Consul-Index"] then
     return nil, "missing consul index"
   else
@@ -56,66 +54,102 @@ function _parse_service(service_id, response)
   end
   service.upstreams = {}
   for k, v in pairs(content) do
-    -- if v["ServiceID"] == service_id then -- I think this check is useless
     table.insert(service.upstreams, {
         address = v["Address"],
         port = v["ServicePort"],
       })
-    -- end
   end
   return service
 end
 
-function _persist(service)
+function _persist(service_name, service)
   -- TODO: save to shared storage
-  _M._cache[service.id] = service
+  _M._cache[service_name] = service
 end
 
-function _aquire(service_id)
+function _aquire(service_name)
   -- TODO: get from shared storage
-  return _M._cache[service_id]
+  return _M._cache[service_name]
 end
 
-function _refresh(service_id, hc, index)
-  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_id .. "?index=" .. index .. "&wait=5m"
+function _build_service_uri(service_descriptor, service_index)
+  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_descriptor.service .. "?index=" .. service_index .. "&wait=5m"
+  if service_descriptor.dc ~= nil then
+    uri = uri .. "&dc=" .. service_descriptor.dc
+  end
+  if service_descriptor.tag ~= nil then
+    uri = uri .. "&tag=" .. service_descriptor.tag
+  end
+  if service_descriptor.near ~= nil then
+    uri = uri .. "&near=" .. service_descriptor.near
+  end
+  if service_descriptor.meta ~= nil then
+    uri = uri .. "&node-meta=" .. service_descriptor.meta
+  end
+  return uri
+end
+
+function _refresh(hc, uri)
   ngx.log(ngx.INFO, "consul.balancer: query uri: ", uri)
   local res, err = hc:request_uri(uri, {
     method = "GET"
   })
   if res == nil then
-    ngx.log(ngx.ERR, "consul.balancer: FAILED to refresh upstreams: ", err)
+    ngx.log(ngx.ERR, "consul.balancer: failed to refresh upstreams: ", err)
     return nil, err
-  else
-    local service, err = _parse_service(service_id, res)
-    if err == nil then
-      -- TODO: Save only newer data from consul to reduce GC load
-      ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_id, " index: ", service.index)
-      _persist(service)
-      return service
-    else
-      ngx.log(ngx.ERR, "consul.balancer: failed to parse consul response: ", err)
-      return nil, err
+  end
+  local service, err = _parse_service(res)
+  if err ~= nil then
+    ngx.log(ngx.ERR, "consul.balancer: failed to parse consul response: ", err)
+    return nil, err
+  end
+  return service
+end
+
+function _validate_service_descriptor(service_descriptor)
+  if type(service_descriptor) == "string" then
+    service_descriptor = {
+      name = service_descriptor,
+      service = service_descriptor,
+      tag = nil
+    }
+  elseif type(service_descriptor) == "table" then
+    if service_descriptor.name == nil then
+      return nil, "missing name field in service_descriptor"
+    end
+    if service_descriptor.service == nil then
+      service_descriptor.service = service_descriptor.name
     end
   end
+  return service_descriptor
 end
 
 -- signature must match nginx timer API
-function _watch(premature, service_id)
+function _watch(premature, service_descriptor)
   if premature then
+    return nil
+  end
+  service_descriptor, err = _validate_service_descriptor(service_descriptor)
+  if err ~= nil then
+    ngx.log(ngx.ERR, "consul.balancer: ", err)
     return nil
   end
   local hc = http:new()
   hc:set_timeout(360000) -- consul api has a default of 5 minutes for tcp long poll
   local service_index = 0
-  ngx.log(ngx.NOTICE, "consul.balancer: started watching for changes in ", service_id)
+  ngx.log(ngx.NOTICE, "consul.balancer: started watching for changes in ", service_descriptor.name)
   while true do
-    local service, err = _refresh(service_id, hc, service_index)
-    if err ~= nil then
-      ngx.log(ngx.ERR, "consul.balancer: failed while watching for changes in ", service_id)
-      _timer(WATCH_RETRY_TIMER, _watch, service_id)
+    local uri = _build_service_uri(service_descriptor, service_index)
+    local service, err = _refresh(hc, uri)
+    if service == nil then
+      ngx.log(ngx.ERR, "consul.balancer: failed while watching for changes in ", service_descriptor.name, " retry scheduled")
+      _timer(WATCH_RETRY_TIMER, _watch, service_descriptor)
       return nil
     end
+    -- TODO: Save only newer data from consul to reduce GC load
     service_index = service.index
+    _persist(service_descriptor.name, service)
+    ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_descriptor.name, " index: ", service_index)
   end
 end
 
@@ -127,14 +161,14 @@ function _M.watch(consul_uri, service_list)
   end
 end
 
-function _M.round_robin(service_id)
-  local service = _aquire(service_id)
+function _M.round_robin(service_name)
+  local service = _aquire(service_name)
   if service == nil then
-    ngx.log(ngx.ERR, "consul.balancer: no entry found for service: ", service_id)
+    ngx.log(ngx.ERR, "consul.balancer: no entry found for service: ", service_name)
     return ngx.exit(500)
   end
   if service.upstreams == nil or #service.upstreams == 0 then
-    ngx.log(ngx.ERR, "consul.balancer: no peers for service: ", service_id)
+    ngx.log(ngx.ERR, "consul.balancer: no peers for service: ", service_name)
   end
   if service.state == nil or service.state > #service.upstreams then
     service.state = 1
