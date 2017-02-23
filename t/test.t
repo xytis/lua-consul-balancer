@@ -62,3 +62,17 @@ GET /foo
 --- no_error_log
 [error]
 [warn]
+
+=== TEST 2: Retries
+--- http_config eval: $::HttpConfig
+--- config
+    location = /bar {
+        proxy_next_upstream error timeout  invalid_header http_500 http_502 http_503 http_504 http_403 http_404;
+        proxy_pass http://upstream_bar;
+    }
+--- request
+GET /bar
+--- response_body_like: bar-.*
+--- no_error_log
+[error]
+[warn]

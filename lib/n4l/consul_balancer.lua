@@ -17,7 +17,7 @@ end
 
 local _M = new_tab(0, 5) -- Change the second number.
 
-_M.VERSION = "0.02"
+_M.VERSION = "0.03"
 _M._cache = {}
 
 function _sanitize_uri(consul_uri)
@@ -177,9 +177,24 @@ function _M.round_robin(service_name)
   if service.state == nil or service.state > #service.upstreams then
     service.state = 1
   end
+  -- Persisting history
+  if ngx.ctx._round_robin == nil then
+    ngx.ctx._round_robin = {
+      start = service.state,
+      remaining = #service.upstreams - 1,
+      last = service.state
+    }
+  else
+    -- TODO: https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
+    -- Implement some proper state persistance
+    ngx.ctx._round_robin.remaining = ngx.ctx._round_robin.remaining - 1
+    ngx.ctx._round_robin.last = service.state
+  end
+  -- Picking next upstream
   local upstream = service.upstreams[service.state]
   service.state = service.state + 1
 
+  local ok, err = balancer.set_more_tries(ngx.ctx._round_robin.remaining)
   local ok, err = balancer.set_current_peer(upstream["address"], upstream["port"])
   if not ok then
     ngx.log(ngx.ERR, "consul.balancer: failed to set the current peer: ", err)
