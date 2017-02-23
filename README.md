@@ -45,4 +45,7 @@ Upstream usage is normal and follows all expected nginx rules:
       proxy_pass http://upstream_foo;
     }
 
+## Known issues
 
+Due to limitation of 'init_worker_by_lua_*' to [run lua cosockets](https://github.com/openresty/lua-nginx-module#cosockets-not-available-everywhere)
+initial lookup is done async from the startup sequence. That leaves a delay, measurable in roundtrip time from consul to nginx, until lua balancer has upstreams to forward requests to.
