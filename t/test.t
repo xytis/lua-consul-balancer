@@ -66,15 +66,17 @@ GET /foo
 === TEST 2: Retries
 --- http_config eval: $::HttpConfig
 --- config
+    location = /foo {
+        proxy_pass http://upstream_foo;
+    }
     location = /bar {
-        proxy_next_upstream error timeout  invalid_header http_500 http_502 http_503 http_504 http_403 http_404;
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504 http_403 http_404;
         proxy_pass http://upstream_bar;
     }
 --- request
 GET /bar
 --- response_body_like: bar-.*
---- no_error_log
-[error]
 --- error_log
-(111: Connection refused) while connecting to upstream
+(111: Connection refused)
+--- no_error_log
 [warn]

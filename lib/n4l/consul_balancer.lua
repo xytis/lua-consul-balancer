@@ -20,19 +20,19 @@ local _M = new_tab(0, 5) -- Change the second number.
 _M.VERSION = "0.03"
 _M._cache = {}
 
-function _sanitize_uri(consul_uri)
+local function _sanitize_uri(consul_uri)
   -- TODO: Ensure that uri has <proto>://<host>[:<port>] scheme
   return consul_uri
 end
 
-function _timer(...)
+local function _timer(...)
   local ok, err = ngx.timer.at(...)
   if not ok then
     ngx.log(ngx.ERR, "[FATAL] consul.balancer: failed to create timer: ", err)
   end
 end
 
-function _parse_service(response)
+local function _parse_service(response)
   if response.status ~= 200 then
     return nil, "bad response code: " .. response.status
   end
@@ -55,24 +55,24 @@ function _parse_service(response)
   service.upstreams = {}
   for k, v in pairs(content) do
     table.insert(service.upstreams, {
-        address = v["Address"],
+        address = v["ServiceAddress"] ~= "" and v["ServiceAddress"] or v["Address"],
         port = v["ServicePort"],
       })
   end
   return service
 end
 
-function _persist(service_name, service)
+local function _persist(service_name, service)
   -- TODO: save to shared storage
   _M._cache[service_name] = service
 end
 
-function _aquire(service_name)
+local function _aquire(service_name)
   -- TODO: get from shared storage
   return _M._cache[service_name]
 end
 
-function _build_service_uri(service_descriptor, service_index)
+local function _build_service_uri(service_descriptor, service_index)
   local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_descriptor.service
   local args = {
     index = service_index,
@@ -93,7 +93,7 @@ function _build_service_uri(service_descriptor, service_index)
   return uri .. "?" .. ngx.encode_args(args)
 end
 
-function _refresh(hc, uri)
+local function _refresh(hc, uri)
   ngx.log(ngx.INFO, "consul.balancer: query uri: ", uri)
   local res, err = hc:request_uri(uri, {
     method = "GET"
@@ -110,7 +110,7 @@ function _refresh(hc, uri)
   return service
 end
 
-function _validate_service_descriptor(service_descriptor)
+local function _validate_service_descriptor(service_descriptor)
   if type(service_descriptor) == "string" then
     service_descriptor = {
       name = service_descriptor,
@@ -129,7 +129,7 @@ function _validate_service_descriptor(service_descriptor)
 end
 
 -- signature must match nginx timer API
-function _watch(premature, service_descriptor)
+local function _watch(premature, service_descriptor)
   if premature then
     return nil
   end
@@ -173,6 +173,7 @@ function _M.round_robin(service_name)
   end
   if service.upstreams == nil or #service.upstreams == 0 then
     ngx.log(ngx.ERR, "consul.balancer: no peers for service: ", service_name)
+    return ngx.exit(500)
   end
   if service.state == nil or service.state > #service.upstreams then
     service.state = 1
