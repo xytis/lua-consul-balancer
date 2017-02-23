@@ -84,8 +84,8 @@ script:
   - "curl -X PUT -d '{\"ID\": \"foo-3\", \"Name\": \"foo\", \"Port\": 8669 }' http://127.0.0.1:8500/v1/agent/service/register"
   - curl -s http://127.0.0.1:8500/v1/catalog/service/foo?pretty | grep ServiceID
   - while true; do echo -ne "HTTP/1.0 200 OK\r\n\r\nbar-1:8665\r\n" | nc -l -p 8665 >> access.log; done &
-  - "curl -X PUT -d '{\"ID\": \"bar-1\", \"Name\": \"bar\", \"Port\": 8666 }' http://127.0.0.1:8500/v1/agent/service/register"
-  - "curl -X PUT -d '{\"ID\": \"bar-2\", \"Name\": \"bar\", \"Port\": 8666 }' http://127.0.0.1:8500/v1/agent/service/register"
+  - "curl -X PUT -d '{\"ID\": \"bar-1\", \"Name\": \"bar\", \"Port\": 8663 }' http://127.0.0.1:8500/v1/agent/service/register"
+  - "curl -X PUT -d '{\"ID\": \"bar-2\", \"Name\": \"bar\", \"Port\": 8664 }' http://127.0.0.1:8500/v1/agent/service/register"
   - "curl -X PUT -d '{\"ID\": \"bar-3\", \"Name\": \"bar\", \"Port\": 8665 }' http://127.0.0.1:8500/v1/agent/service/register"
   - curl -s http://127.0.0.1:8500/v1/catalog/service/bar?pretty | grep ServiceID
   #test launcher

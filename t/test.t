@@ -75,4 +75,6 @@ GET /bar
 --- response_body_like: bar-.*
 --- no_error_log
 [error]
+--- error_log
+(111: Connection refused) while connecting to upstream
 [warn]
