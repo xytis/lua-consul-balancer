@@ -73,20 +73,24 @@ function _aquire(service_name)
 end
 
 function _build_service_uri(service_descriptor, service_index)
-  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_descriptor.service .. "?index=" .. service_index .. "&wait=5m"
+  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_descriptor.service
+  local args = {
+    index = service_index,
+    wait = "5m"
+  }
   if service_descriptor.dc ~= nil then
-    uri = uri .. "&dc=" .. service_descriptor.dc
+    args.dc = service_descriptor.dc
   end
   if service_descriptor.tag ~= nil then
-    uri = uri .. "&tag=" .. service_descriptor.tag
+    args.tag = service_descriptor.tag
   end
   if service_descriptor.near ~= nil then
-    uri = uri .. "&near=" .. service_descriptor.near
+    args.near = service_descriptor.near
   end
-  if service_descriptor.meta ~= nil then
-    uri = uri .. "&node-meta=" .. service_descriptor.meta
+  if service_descriptor["node-meta"] ~= nil then
+    args["node-meta"] = service_descriptor["node-meta"]
   end
-  return uri
+  return uri .. "?" .. ngx.encode_args(args)
 end
 
 function _refresh(hc, uri)
