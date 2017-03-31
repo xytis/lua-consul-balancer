@@ -21,7 +21,11 @@ our $HttpConfig = qq{
 
     init_worker_by_lua_block {
         local consul_balancer = require "n4l.consul_balancer"
-        consul_balancer.watch("http://127.0.0.1:8500", {"foo", { name = "bar", service = "bar" }})
+        consul_balancer.watch("http://127.0.0.1:8500", {
+        "foo",
+        { name = "bar", service = "bar" },
+        "poo"
+        })
     }
 
     upstream upstream_foo {
@@ -37,6 +41,14 @@ our $HttpConfig = qq{
         balancer_by_lua_block {
             local consul_balancer = require "n4l.consul_balancer"
             consul_balancer.round_robin("bar")
+        }
+    }
+
+    upstream upstream_poo {
+        server 127.0.0.1:666;
+        balancer_by_lua_block {
+            local consul_balancer = require "n4l.consul_balancer"
+            consul_balancer.round_robin("poo")
         }
     }
 };
@@ -80,3 +92,17 @@ GET /bar
 (111: Connection refused)
 --- no_error_log
 [warn]
+
+=== TEST 3: Health
+--- http_config eval: $::HttpConfig
+--- config
+    location = /poo {
+        proxy_pass http://upstream_poo;
+    }
+--- request
+GET /poo
+--- error_log
+no peers for service
+--- no_error_log
+[warn]
+
