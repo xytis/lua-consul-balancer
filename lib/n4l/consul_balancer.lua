@@ -54,10 +54,20 @@ local function _parse_service(response)
   end
   service.upstreams = {}
   for k, v in pairs(content) do
-    table.insert(service.upstreams, {
-        address = v["ServiceAddress"] ~= "" and v["ServiceAddress"] or v["Address"],
-        port = v["ServicePort"],
-      })
+    local passing = true
+    local checks = v["Checks"]
+    for i, c in pairs(checks) do
+      if c["Status"] ~= "passing" then
+        passing = false
+      end
+    end
+    if passing then
+      local s = v["Service"]
+      table.insert(service.upstreams, {
+          address = s["Address"],
+          port = s["Port"],
+        })
+    end
   end
   return service
 end
@@ -73,7 +83,7 @@ local function _aquire(service_name)
 end
 
 local function _build_service_uri(service_descriptor, service_index)
-  local uri = _M._consul_uri .. "/v1/catalog/service/" .. service_descriptor.service
+  local uri = _M._consul_uri .. "/v1/health/service/" .. service_descriptor.service
   local args = {
     index = service_index,
     wait = "5m"
