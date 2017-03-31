@@ -76,4 +76,7 @@ curl -X PUT -d '{"ID": "bar-1", "Name": "bar", "Port": 8665 }' http://127.0.0.1:
 
 curl -s http://127.0.0.1:8500/v1/catalog/service/bar?pretty | grep ServiceID
 
+curl -X PUT -d '{"ID": "poo-dead", "Name": "poo", "Port": 666, "Check": {"HTTP": "http://127.0.0.1:666/health", "Interval": "10s"}}' http://127.0.0.1:8500/v1/agent/service/register
+curl -s http://127.0.0.1:8500/v1/catalog/service/poo?pretty | grep ServiceID
+
 prove -r t

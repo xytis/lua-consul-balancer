@@ -63,8 +63,9 @@ local function _parse_service(response)
     end
     if passing then
       local s = v["Service"]
+      local na = v["Node"]["Address"]
       table.insert(service.upstreams, {
-          address = s["Address"],
+          address = s["Address"] ~= "" and s["Address"] or na,
           port = s["Port"],
         })
     end
