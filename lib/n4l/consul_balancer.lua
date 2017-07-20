@@ -17,7 +17,7 @@ end
 
 local _M = new_tab(0, 5) -- Change the second number.
 
-_M.VERSION = "0.03"
+_M.VERSION = "0.04"
 _M._cache = {}
 
 local function _sanitize_uri(consul_uri)
@@ -74,12 +74,17 @@ local function _parse_service(response)
 end
 
 local function _persist(service_name, service)
-  -- TODO: save to shared storage
+  if _M.shared_cache then
+    _M.shared_cache:set(service_name, json.encode(service))
+    return
+  end
   _M._cache[service_name] = service
 end
 
 local function _aquire(service_name)
-  -- TODO: get from shared storage
+  if _M.shared_cache then
+    return json.decode(_M.shared_cache:get(service_name))
+  end
   return _M._cache[service_name]
 end
 
@@ -169,6 +174,10 @@ local function _watch(premature, service_descriptor)
 end
 
 function _M.watch(consul_uri, service_list)
+  -- start watching on first worker only, skip for others (if shared storage provided)
+  if _M.shared_cache and ngx.worker.id() > 0 then
+    return
+  end
   -- TODO: Reconsider scope for this variable.
   _M._consul_uri = _sanitize_uri(consul_uri)
   for k,v in pairs(service_list) do
@@ -189,28 +198,27 @@ function _M.round_robin(service_name)
   if service.state == nil or service.state > #service.upstreams then
     service.state = 1
   end
-  -- Persisting history
-  if ngx.ctx._round_robin == nil then
-    ngx.ctx._round_robin = {
-      start = service.state,
-      remaining = #service.upstreams - 1,
-      last = service.state
-    }
-  else
-    -- TODO: https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
-    -- Implement some proper state persistance
-    ngx.ctx._round_robin.remaining = ngx.ctx._round_robin.remaining - 1
-    ngx.ctx._round_robin.last = service.state
+  -- TODO: https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
+  -- set max tries only at first attempt
+  if not balancer.get_last_failure() then
+    balancer.set_more_tries(#service.upstreams - 1)
   end
   -- Picking next upstream
   local upstream = service.upstreams[service.state]
   service.state = service.state + 1
-
-  local ok, err = balancer.set_more_tries(ngx.ctx._round_robin.remaining)
+  _persist(service_name, service)
   local ok, err = balancer.set_current_peer(upstream["address"], upstream["port"])
   if not ok then
     ngx.log(ngx.ERR, "consul.balancer: failed to set the current peer: ", err)
     return ngx.exit(500)
+  end
+end
+
+function _M.set_shared_dict_name(dict_name)
+  _M.shared_cache = ngx.shared[dict_name]
+  if not _M.shared_cache then
+    ngx.log(ngx.ERR, "consul.balancer: unable to access shared dict ", dict_name)
+    return ngx.exit(ngx.ERROR)
   end
 end
 

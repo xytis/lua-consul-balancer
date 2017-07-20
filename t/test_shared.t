@@ -12,6 +12,8 @@ our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;/usr/local/lib/lua/?.lua;;";
     error_log logs/error.log debug;
 
+    lua_shared_dict consul_balancer 16k;
+
     init_by_lua_block {
         if $ENV{TEST_COVERAGE} == 1 then
             jit.off()
@@ -21,10 +23,11 @@ our $HttpConfig = qq{
 
     init_worker_by_lua_block {
         local consul_balancer = require "n4l.consul_balancer"
+        consul_balancer.set_shared_dict_name("consul_balancer")
         consul_balancer.watch("http://127.0.0.1:8500", {
-        "foo",
-        { name = "bar", service = "bar" },
-        "poo"
+            "foo",
+            { name = "bar", service = "bar" },
+            "poo"
         })
     }
 
