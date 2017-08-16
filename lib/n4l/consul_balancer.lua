@@ -83,7 +83,8 @@ end
 
 local function _aquire(service_name)
   if _M.shared_cache then
-    return json.decode(_M.shared_cache:get(service_name))
+    local service_json = _M.shared_cache:get(service_name)
+    return service_json and json.decode(service_json) or nil
   end
   return _M._cache[service_name]
 end
@@ -169,7 +170,8 @@ local function _watch(premature, service_descriptor)
     -- TODO: Save only newer data from consul to reduce GC load
     service_index = service.index
     _persist(service_descriptor.name, service)
-    ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_descriptor.name, " index: ", service_index)
+    ngx.log(ngx.INFO, "consul.balancer: persisted service ", service_descriptor.name,
+                      " index: ", service_index, " content: ", json.encode(service))
   end
 end
 
