@@ -8,7 +8,7 @@ Consul enabled upstream balancer. Does exactly what is advertised -- enables ngi
 
 Each nginx worker must initialize the library:
 
-    lua_shared_dict consul_balancer 16k;
+    lua_shared_dict consul_balancer 4m;
 
     init_worker_by_lua_block {
       local consul_balancer = require "n4l.consul_balancer"
