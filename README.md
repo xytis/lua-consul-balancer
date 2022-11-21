@@ -26,7 +26,8 @@ You may define extended attributes in service descriptor:
         tag="http",
         near="_agent",
         dc="dc2",
-        ["node-meta"]="key:value"
+        ["node-meta"]="key:value",
+        token="consul-token"
       }
     })
 

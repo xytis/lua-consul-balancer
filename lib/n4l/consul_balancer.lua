@@ -107,6 +107,9 @@ local function _build_service_uri(service_descriptor, service_index)
   if service_descriptor["node-meta"] ~= nil then
     args["node-meta"] = service_descriptor["node-meta"]
   end
+  if service_descriptor.token ~= nil then
+    args.token = service_descriptor.token
+  end
   return uri .. "?" .. ngx.encode_args(args)
 end
 
