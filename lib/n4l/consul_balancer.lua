@@ -162,7 +162,7 @@ local function _watch(premature, service_descriptor)
   hc:set_timeout(360000) -- consul api has a default of 5 minutes for tcp long poll
   local service_index = 0
   ngx.log(ngx.NOTICE, "consul.balancer: started watching for changes in ", service_descriptor.name)
-  while true do
+  while not ngx.worker.exiting() do
     local uri = _build_service_uri(service_descriptor, service_index)
     local service, err = _refresh(hc, uri)
     if service == nil then
