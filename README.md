@@ -2,17 +2,17 @@
 
 [![Build Status](https://travis-ci.org/xytis/lua-consul-balancer.svg?branch=master)](https://travis-ci.org/xytis/lua-consul-balancer)
 
-Consul enabled upstream balancer. Does exactly what is advertised -- enables nginx to use consul service discovery to forward requests to dynamic upstreams.
+Consul enabled upstream balancer. Does exactly what is advertised -- enables nginx to use consul service discovery to forward requests to dynamic upstreams, and upstream servers support weighting(consul version must >= 1.2.3).
 
 ## Usage
 
 Each nginx worker must initialize the library:
 
-    lua_shared_dict consul_balancer 4m;
+    lua_package_path '/path/to/lua-consul-balancer/lib/?.lua;/path/to/lua-resty-http/lib/?.lua;/path/to/lua-resty-balancer/lib/?.lua;;';
+    lua_package_cpath '/path/to/lua-resty-balancer/?.so;;';
 
     init_worker_by_lua_block {
       local consul_balancer = require "n4l.consul_balancer"
-      consul_balancer.set_shared_dict_name("consul_balancer") # name of shared dictionary to keep cache in
       consul_balancer.watch("http://127.0.0.1:8500", {"foo", "bar"})
     }
 
