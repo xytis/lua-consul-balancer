@@ -8,7 +8,7 @@ Consul enabled upstream balancer. Does exactly what is advertised -- enables ngi
 
 Each nginx worker must initialize the library:
 
-    lua_package_path '/lua-consul-balancer/lib/?.lua;/path/to/lua-resty-http/lib/?.lua;/path/tolua-resty-balancer/lib/?.lua;;';
+    lua_package_path '/path/to/lua-consul-balancer/lib/?.lua;/path/to/lua-resty-http/lib/?.lua;/path/to/lua-resty-balancer/lib/?.lua;;';
     lua_package_cpath '/path/to/lua-resty-balancer/?.so;;';
 
     init_worker_by_lua_block {
